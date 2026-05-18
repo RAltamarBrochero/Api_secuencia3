@@ -1,0 +1,53 @@
+================================================================================
+API_ROWBOAT — REGISTRO DE IMPLEMENTACIÓN
+================================================================================
+Fecha: 2026-05-17
+Carpeta: C:\Users\Rafael\Desktop\Api_secuencia3
+
+RESUMEN
+-------
+Implementación real (no placeholders en completed). Jobs fallan con mensaje
+claro si faltan dependencias o credenciales.
+
+SIN CREDENCIALES / SIN INSTALAR EXTRA
+-------------------------------------
+- GET /health, GET /jobs, GET /providers, GET /capabilities
+- POST /jobs → failed (sin handler)
+- POST /image/generate → failed (sin HF_API_TOKEN)
+- POST /audio/transcribe → failed (sin openai-whisper)
+- POST /video/process-basic → failed (sin ffmpeg)
+- POST /media/image/generate → failed (sin ComfyUI o sin workflow JSON)
+- POST /media/audio/stt → failed (sin REPLICATE_API_TOKEN)
+- Dashboard + CORS (file:// y localhost)
+
+REQUIERE CONFIGURACIÓN EXTERNA
+------------------------------
+- HF_API_TOKEN → imagen v1 real
+- openai-whisper + ffmpeg → audio v1
+- ffmpeg en PATH → video v1
+- ComfyUI :8188 + api_rowboat/workflows/image-generate-v1.json → imagen v2
+- REPLICATE_API_TOKEN + REPLICATE_DEFAULT_MODEL_AUDIO_STT → STT v2
+
+ARCHIVOS PRINCIPALES MODIFICADOS/CREADOS
+---------------------------------------
+- api_rowboat/app/config.py
+- api_rowboat/app/services/job_manager.py
+- api_rowboat/app/providers/* (whisper, huggingface, ffmpeg)
+- api_rowboat/app/services/* (audio, image, video)
+- api_rowboat/app/api/routes.py, routes_v2.py
+- api_rowboat/app/services2/multimedia_orchestrator.py, job_runner.py
+- api_rowboat/app/providers2/adapters/comfyui_adapter.py, replicate_adapter.py
+- api_rowboat/app/providers2/comfyui_client.py, replicate_client.py
+- api_rowboat/app/main.py (CORS)
+- frontend/index.html
+- tests/, scripts/, README.md, TODO.md
+
+COMANDOS PARA USAR HOY
+----------------------
+cd C:\Users\Rafael\Desktop\Api_secuencia3
+copy .env.example .env
+poetry install
+poetry run uvicorn api_rowboat.app.main:app --reload --host 127.0.0.1 --port 8000
+poetry run pytest -q
+
+================================================================================

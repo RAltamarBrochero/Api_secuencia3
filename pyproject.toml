@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "api_rowboat"
+version = "0.1.0"
+description = "API híbrida local+externa para imagen, video y audio (v1)"
+authors = ["Api Rowboat <dev@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "^0.95.0"
+uvicorn = {extras = ["standard"], version = "^0.22.0"}
+pydantic = "^1.10.0"
+python-multipart = "^0.0.6"
+requests = "^2.31.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.3"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
