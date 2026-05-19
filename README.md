@@ -1,108 +1,249 @@
-# Api_rowboat
+# Api Rowboat — API híbrida local+remota para multimedia (v2)
 
-API híbrida (local + remota) para **audio, imagen y video** con jobs en disco: `storage/jobs/<job_id>/`.
+API FastAPI para procesamiento de imagen, video y audio vía providers locales (ComfyUI) y remotos (Replicate).
 
-## Quick start (Windows)
+---
 
-### 1. Entorno
+## Dependencias del sistema
 
-```powershell
-cd C:\Users\Rafael\Desktop\Api_secuencia3
-copy .env.example .env
+| Herramienta | Requerida | Para qué |
+|---|---|---|
+| Python ≥ 3.10 | ✅ Siempre | Runtime |
+| [Poetry](https://python-poetry.org/docs/#installation) | ✅ Siempre | Gestión de paquetes |
+| ffmpeg | Solo v1 `/video/process-basic` | Procesamiento de video local |
+| whisper (openai-whisper) | Solo v1 `/audio/transcribe` local | STT local (alternativa a Replicate) |
+| [ComfyUI](https://github.com/comfyanonymous/ComfyUI) | Opcional | Provider local de imagen |
+
+## Tokens / Variables de entorno
+
+Copia `.env.example` → `.env` y configura:
+
+```bash
+cp .env.example .env
 ```
 
-Edita `.env` con tus tokens (opcional al inicio). **No subas `.env` a git.**
+| Variable | Descripción | Ejemplo |
+|---|---|---|
+| `REPLICATE_API_TOKEN` | Token de [replicate.com](https://replicate.com) | `r8_abc123...` |
+| `REPLICATE_DEFAULT_MODEL_AUDIO_STT` | Modelo Whisper en Replicate | `openai/whisper:30414ee7c4fffc37e260fcab7842b5be470b9b840f2b608f5baa9bbef9a259ed` |
+| `COMFYUI_BASE_URL` | URL de ComfyUI si está levantado localmente | `http://127.0.0.1:8188` |
+| `COMFYUI_ENABLED` | Activar/desactivar ComfyUI | `true` / `false` |
+| `REPLICATE_ENABLED` | Activar/desactivar Replicate | `true` / `false` |
+| `HF_API_TOKEN` | Token HuggingFace para v1 `/image/generate` | `hf_abc...` |
 
-### 2. Instalar y arrancar
+---
 
-```powershell
+## Instalación
+
+```bash
+# 1. Instalar dependencias Python
 poetry install
+
+# 2. Verificar la instalación con los tests
+poetry run pytest
+
+# 3. Levantar el servidor
 poetry run uvicorn api_rowboat.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-O: `.\scripts\dev.ps1`
+Accede a la documentación interactiva en: http://127.0.0.1:8000/docs
 
-### 3. Probar
+---
 
-```powershell
-curl http://127.0.0.1:8000/health
+## Ciclo completo — ejemplo con `curl`
+
+### 1. Verificar estado del servicio
+
+```bash
+curl -s http://127.0.0.1:8000/health | jq .
+# {"status": "ok", "version": "0.1.0"}
 ```
 
-Documentación interactiva: http://127.0.0.1:8000/docs
+### 2. Ver providers disponibles y su estado
 
-### 4. Dashboard (3 pasos)
-
-1. Arranca la API (paso 2).
-2. Abre `frontend/index.html` en el navegador (doble clic).
-3. Pulsa **↻ PING** — debe mostrar Online (`http://127.0.0.1:8000`).
-
-## Qué funciona sin credenciales
-
-| Función | Endpoint | Sin deps |
-|---------|----------|----------|
-| Health | `GET /health` | Sí |
-| Listar jobs | `GET /jobs` | Sí |
-| Job genérico | `POST /jobs` | `failed` (sin handler) |
-| Providers / capabilities v2 | `GET /providers`, `GET /capabilities` | Sí |
-| Imagen v1 | `POST /image/generate` | `failed` sin `HF_API_TOKEN` |
-| Audio v1 | `POST /audio/transcribe` | `failed` sin whisper/ffmpeg |
-| Video v1 | `POST /video/process-basic` | `failed` sin ffmpeg |
-| Imagen v2 ComfyUI | `POST /media/image/generate` | `failed` sin ComfyUI/workflow |
-| STT v2 Replicate | `POST /media/audio/stt` | `failed` sin `REPLICATE_API_TOKEN` |
-
-## Requisitos por servicio
-
-| Servicio | Variable / instalación |
-|----------|-------------------------|
-| Imagen v1 (Hugging Face) | `HF_API_TOKEN` en `.env` |
-| Audio v1 (Whisper local) | `pip install openai-whisper` + **ffmpeg** en PATH |
-| Video v1 | **ffmpeg** en PATH (`winget install Gyan.FFmpeg`) |
-| Imagen v2 (ComfyUI) | ComfyUI en `8188` + `api_rowboat/workflows/image-generate-v1.json` |
-| STT v2 (Replicate) | `REPLICATE_API_TOKEN` + `REPLICATE_DEFAULT_MODEL_AUDIO_STT` |
-
-## API v1
-
-- `GET /health`
-- `GET /jobs`, `GET /jobs/{id}`, `GET /jobs/{id}/outputs/{basename}`
-- `POST /jobs` — job genérico (sin handler → `failed`)
-- `POST /audio/transcribe` — multipart `file`
-- `POST /image/generate` — `{"prompt":"..."}`
-- `POST /video/process-basic` — multipart `file`
-
-## API v2
-
-- `GET /providers`, `GET /providers/{id}/health`, `GET /capabilities`
-- `POST /media/image/generate`, `/media/audio/stt`, … (ver `/docs`)
-- `GET /jobs/{id}`, `POST /jobs/{id}/cancel`
-
-Jobs v2 usan el mismo storage y `GET /jobs/{id}` v1 para descargar outputs.
-
-## Ejemplos curl
-
-```powershell
-curl -X POST http://127.0.0.1:8000/image/generate -H "Content-Type: application/json" -d "{\"prompt\":\"a red boat\"}"
-curl http://127.0.0.1:8000/jobs/JOB_ID
-curl -O http://127.0.0.1:8000/jobs/JOB_ID/outputs/JOB_ID_image.png
-
-curl -X POST http://127.0.0.1:8000/media/image/generate -H "Content-Type: application/json" -d "{\"prompt\":\"a red boat\"}"
-curl -X POST http://127.0.0.1:8000/media/audio/stt -H "Content-Type: application/json" -d "{\"input_audio\":\"https://example.com/sample.wav\"}"
+```bash
+curl -s http://127.0.0.1:8000/providers | jq .
+curl -s http://127.0.0.1:8000/providers/replicate/health | jq .
 ```
 
-## Tests y smoke
+### 3. Crear un job de imagen (requiere REPLICATE_API_TOKEN)
 
-```powershell
-poetry run pytest -q
-.\scripts\smoke.ps1
+```bash
+JOB=$(curl -s -X POST http://127.0.0.1:8000/media/image/generate \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "a red sailboat at sunset, photorealistic"}')
+echo $JOB | jq .
+
+JOB_ID=$(echo $JOB | jq -r '.job_id')
+echo "Job ID: $JOB_ID"
 ```
 
-## Storage
+### 4. Consultar estado del job
 
-- `storage/jobs/<job_id>/inputs/`
-- `storage/jobs/<job_id>/outputs/`
-- `storage/jobs/<job_id>/temp/`
+```bash
+curl -s http://127.0.0.1:8000/jobs/$JOB_ID | jq .
+# {
+#   "job_id": "...",
+#   "status": "completed",   # pending → running → completed / failed / cancelled
+#   "capability": "image.generate",
+#   "outputs": {"image_path": "storage/jobs/.../outputs/..._generated.png"}
+# }
+```
 
-## Futuro (no implementado)
+### 5. Ver el manifest de outputs
 
-- Redis/Celery — ver `docs/MIGRATION_TO_REDIS_CELERY.md`
-- Autenticación API keys
-- Resto de capabilities v2 (edit, tts, video.generate, …)
+```bash
+curl -s http://127.0.0.1:8000/jobs/$JOB_ID/manifest | jq .
+# {
+#   "job_id": "...",
+#   "files": {
+#     "image_path": {
+#       "basename": "..._generated.png",
+#       "size_bytes": 123456,
+#       "download_route": "/jobs/.../outputs/..._generated.png"
+#     }
+#   }
+# }
+```
+
+### 6. Descargar el output
+
+```bash
+curl -s http://127.0.0.1:8000/jobs/$JOB_ID/outputs/$(curl -s http://127.0.0.1:8000/jobs/$JOB_ID/manifest | jq -r '.files | to_entries[0].value.basename') \
+  -o resultado.png
+```
+
+O directamente con el basename:
+
+```bash
+curl -s "http://127.0.0.1:8000/jobs/$JOB_ID/outputs/${JOB_ID}_generated.png" -o resultado.png
+```
+
+### 7. Cancelar un job
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/jobs/$JOB_ID/cancel | jq .
+# {"status": "cancelled", ...}
+```
+
+---
+
+## Flujo de estados de un job
+
+```
+pending → running → completed
+                 ↘ failed
+                 ↘ cancelled  ← POST /jobs/{id}/cancel
+```
+
+- Un job en estado terminal (`completed`, `failed`, `cancelled`) no puede cambiar de estado.
+- `cancel` es idempotente: llamarlo en un job ya terminal devuelve el estado actual sin error.
+
+---
+
+## Endpoints v2 disponibles
+
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/capabilities` | GET | Lista de capabilities soportadas |
+| `/providers` | GET | Providers registrados con sus capabilities |
+| `/providers/{id}/health` | GET | Estado de un provider |
+| `/media/image/generate` | POST | Generar imagen desde prompt |
+| `/media/image/edit` | POST | Editar imagen con prompt |
+| `/media/image/inpaint` | POST | Inpainting con máscara |
+| `/media/image/upscale` | POST | Upscale de imagen |
+| `/media/image/face-swap` | POST | Face swap |
+| `/media/video/generate` | POST | Generar video desde prompt |
+| `/media/video/process` | POST | Procesar video |
+| `/media/video/lip-sync` | POST | Lip sync video+audio |
+| `/media/audio/tts` | POST | Text to speech |
+| `/media/audio/stt` | POST | Speech to text |
+| `/media/audio/enhance` | POST | Separación de fuentes de audio |
+| `/jobs/{id}` | GET | Estado del job |
+| `/jobs/{id}/manifest` | GET | Manifest de outputs |
+| `/jobs/{id}/outputs/{basename}` | GET | Descarga de un output |
+| `/jobs/{id}/cancel` | POST | Cancelar un job |
+
+---
+
+## Scripts reproducibles
+
+```bash
+# Instalar
+poetry install
+
+# Tests
+poetry run pytest
+
+# Tests con reporte de cobertura
+poetry run pytest -v
+
+# Servidor de desarrollo
+poetry run uvicorn api_rowboat.app.main:app --reload --host 127.0.0.1 --port 8000
+
+# Smoke test (Linux/Mac)
+bash scripts/smoke.sh
+```
+
+---
+
+## Errores — formato estándar
+
+Todos los errores v2 siguen el formato:
+
+```json
+{
+  "error": {
+    "code": "NO_PROVIDER",
+    "message": "No hay ningún provider disponible para la capability 'video.generate'. Configura REPLICATE_API_TOKEN o COMFYUI_BASE_URL en el .env."
+  }
+}
+```
+
+Códigos comunes:
+
+| Código HTTP | Código | Significa |
+|---|---|---|
+| 422 | (Pydantic) | Payload inválido o campo faltante |
+| 503 | `NO_PROVIDER` | Ningún provider disponible o configurado |
+| 503 | `MISSING_CONFIG` | Variable de entorno requerida no configurada |
+| 404 | — | Job, output o provider no encontrado |
+
+---
+
+## Estructura del repositorio
+
+```
+api_rowboat/
+  app/
+    api/
+      routes.py          # v1 (audio/transcribe, image/generate, video/process-basic, jobs)
+      routes_v2.py       # v2 (/media/*, /jobs/*, /capabilities, /providers)
+    capabilities/
+      capability_names.py
+      dtos.py            # Schemas Pydantic con validación
+    interfaces/
+      provider.py        # Protocol MediaProvider
+    providers2/
+      registry.py
+      adapters/
+        replicate_adapter.py   # Todas las capabilities vía Replicate
+        comfyui_adapter.py     # image.generate, inpaint, upscale, face_swap vía ComfyUI
+    services/
+      job_manager.py     # In-memory store + manifest.json
+    services2/
+      multimedia_orchestrator.py
+      capability_router.py
+      job_runner.py
+storage/
+  jobs/<job_id>/
+    inputs/              # Archivos subidos
+    outputs/             # Outputs generados + manifest.json
+    temp/                # Temporales
+tests/
+  conftest.py
+  test_health.py
+  test_jobs_v1.py
+  test_v2_media.py
+  test_jobs_v2_outputs.py
+```

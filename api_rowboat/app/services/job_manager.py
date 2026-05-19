@@ -1,11 +1,17 @@
+import json
 import os
 import shutil
 from copy import deepcopy
+from datetime import datetime, timezone
 from uuid import uuid4
 from typing import Dict, Any, Optional
 from fastapi import UploadFile
 
 from ..config import settings
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 class JobManager:
@@ -45,9 +51,7 @@ class JobManager:
 
     def create_job(self, type_: str, payload: Dict[str, Any] | None = None):
         job_id = str(uuid4())
-        from datetime import datetime
-
-        now = datetime.utcnow().isoformat() + "Z"
+        now = _now_iso()
         job = {
             "id": job_id,
             "type": type_,
@@ -76,11 +80,32 @@ class JobManager:
             job_outputs = job.get("outputs") or {}
             job_outputs.update(outputs)
             job["outputs"] = job_outputs
+            # Write / update manifest.json
+            self._write_manifest(job_id, job_outputs)
         job.update(kwargs)
-        from datetime import datetime
-
-        job["updated_at"] = datetime.utcnow().isoformat() + "Z"
+        job["updated_at"] = _now_iso()
         return job
+
+    def _write_manifest(self, job_id: str, outputs: Dict[str, str]) -> None:
+        """Write manifest.json to storage/jobs/<job_id>/outputs/manifest.json."""
+        dirs = self._job_dirs(job_id)
+        outputs_dir = dirs["outputs_dir"]
+        manifest = {
+            "job_id": job_id,
+            "written_at": _now_iso(),
+            "files": {},
+        }
+        for key, abs_path in outputs.items():
+            if abs_path and isinstance(abs_path, str) and os.path.isfile(abs_path):
+                basename = os.path.basename(abs_path)
+                manifest["files"][key] = {
+                    "basename": basename,
+                    "size_bytes": os.path.getsize(abs_path),
+                    "download_route": f"/jobs/{job_id}/outputs/{basename}",
+                }
+        manifest_path = os.path.join(outputs_dir, "manifest.json")
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=2)
 
     def save_upload(self, job_id: str, upload: UploadFile):
         dest = self.job_input_path(job_id, upload.filename or "upload")
@@ -144,6 +169,8 @@ class JobManager:
         outputs_dir = dirs["outputs_dir"]
         if os.path.isdir(outputs_dir):
             for name in os.listdir(outputs_dir):
+                if name == "manifest.json":
+                    continue
                 path = os.path.join(outputs_dir, name)
                 if os.path.isfile(path):
                     output_files.setdefault(name, path)
