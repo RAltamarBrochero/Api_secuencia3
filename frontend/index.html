@@ -395,6 +395,9 @@
     <button class="nav-btn" onclick="showPanel('audio')" id="nav-audio">
       <span class="icon">◎</span><span class="label">Audio</span>
     </button>
+    <button class="nav-btn" onclick="showPanel('audio-editor')" id="nav-audio-editor">
+      <span class="icon">♯</span><span class="label">Editor Audio</span>
+    </button>
     <button class="nav-btn" onclick="showPanel('video')" id="nav-video">
       <span class="icon">▷</span><span class="label">Video</span>
     </button>
@@ -596,8 +599,110 @@
       </div>
     </div>
 
+    <div class="panel" id="panel-audio-editor">
+      <div class="panel-title">Editor de Audio <span class="badge">denoise · trim · normalize · improve</span></div>
+      <div class="card">
+        <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;padding:16px;">
+
+          <div class="card" style="background:transparent;">
+            <div class="card-header">
+              <span class="card-title">Archivo y operación</span>
+              <span class="endpoint-tag tag-post">POST</span>
+            </div>
+            <div class="card-body">
+              <div class="form-row">
+                <label>Archivo de audio</label>
+                <input type="file" id="ae-file" accept="audio/*,video/*" onchange="previewAudioEditor()" />
+              </div>
+              <div class="preview-area" id="ae-preview" style="min-height:60px;">
+                <div class="preview-placeholder">
+                  <div class="big">♯</div>
+                  Selecciona un archivo
+                </div>
+              </div>
+              <div class="form-row" style="margin-top:12px;">
+                <label>Operación</label>
+                <select id="ae-op" onchange="toggleAudioEditorFields()">
+                  <option value="denoise">Quitar ruido (denoise)</option>
+                  <option value="trim">Recortar (trim)</option>
+                  <option value="normalize">Normalizar volumen</option>
+                  <option value="improve">Mejorar audio (denoise+normalize)</option>
+                </select>
+              </div>
+
+              <div id="ae-fields-denoise" class="ae-fields">
+                <div class="form-row">
+                  <label>Intensidad (0.1 - 1.0)</label>
+                  <div class="row2" style="align-items:center;">
+                    <input type="range" id="ae-denoise-intensity" min="0.1" max="1.0" step="0.1" value="0.5" oninput="document.getElementById('ae-denoise-val').textContent=this.value" />
+                    <span id="ae-denoise-val" style="font-size:13px;color:var(--amber);min-width:30px;">0.5</span>
+                  </div>
+                </div>
+              </div>
+
+              <div id="ae-fields-trim" class="ae-fields" style="display:none;">
+                <div class="row2">
+                  <div class="form-row">
+                    <label>Inicio (seg)</label>
+                    <input type="number" id="ae-trim-start" value="0" min="0" step="0.5" />
+                  </div>
+                  <div class="form-row">
+                    <label>Final (seg) <span style="color:var(--text-dim);font-size:10px;">o duración</span></label>
+                    <input type="number" id="ae-trim-end" min="0" step="0.5" placeholder="ej: 30" />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <label>O duración (seg)</label>
+                  <input type="number" id="ae-trim-duration" min="0" step="0.5" placeholder="ej: 15" />
+                </div>
+              </div>
+
+              <div id="ae-fields-normalize" class="ae-fields" style="display:none;">
+                <div style="font-size:12px;color:var(--text-dim);padding:8px 0;">
+                  Normaliza el volumen dinámicamente sin parámetros adicionales.
+                </div>
+              </div>
+
+              <div id="ae-fields-improve" class="ae-fields" style="display:none;">
+                <div class="form-row">
+                  <label>Intensidad denoise (0.1 - 1.0)</label>
+                  <div class="row2" style="align-items:center;">
+                    <input type="range" id="ae-improve-intensity" min="0.1" max="1.0" step="0.1" value="0.5" oninput="document.getElementById('ae-improve-val').textContent=this.value" />
+                    <span id="ae-improve-val" style="font-size:13px;color:var(--amber);min-width:30px;">0.5</span>
+                  </div>
+                </div>
+                <div style="font-size:11px;color:var(--text-dim);">Combina eliminación de ruido + normalización de volumen.</div>
+              </div>
+
+              <button class="btn btn-primary" id="ae-btn" onclick="submitAudioEditor()" style="width:100%;margin-top:14px;">
+                ▶ Procesar Audio
+              </button>
+            </div>
+          </div>
+
+          <div class="card" style="background:transparent;">
+            <div class="card-header">
+              <span class="card-title">Resultado</span>
+            </div>
+            <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+              <div class="response-label">Job / Respuesta</div>
+              <div class="response-box" id="ae-response"></div>
+              <div class="response-label">Vista previa</div>
+              <div class="preview-area" id="ae-preview-out" style="min-height:100px;">
+                <div class="preview-placeholder">
+                  <div class="big">♯</div>
+                  El resultado aparecerá aquí o en Outputs
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
     <div class="panel" id="panel-video">
-      <div class="panel-title">Procesamiento de Video <span class="badge">POST /video/process-basic</span></div>
+      <div class="panel-title">Procesamiento de Video <span class="badge">POST /video/process-basic · /video/trim</span></div>
       <div class="card">
         <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;padding:16px;">
 
@@ -622,35 +727,31 @@
                 <div class="row2">
                   <div class="form-row">
                     <label>Operación</label>
-                    <select id="video-op">
+                    <select id="video-op" onchange="toggleVideoFields()">
                       <option value="transcode">Transcodificar</option>
                       <option value="trim">Recortar</option>
-                      <option value="resize">Redimensionar</option>
-                      <option value="extract_audio">Extraer Audio</option>
-                      <option value="thumbnail">Thumbnail</option>
                     </select>
-                    <div style="margin-top:6px;font-size:11px;color:var(--text-dim);">(Solo se envía; v1 lo ignora internamente)</div>
                   </div>
                   <div class="form-row">
                     <label>Formato salida</label>
                     <select id="video-fmt">
                       <option value="mp4">MP4</option>
-                      <option value="webm">WebM</option>
-                      <option value="avi">AVI</option>
-                      <option value="gif">GIF</option>
                     </select>
-                    <div style="margin-top:6px;font-size:11px;color:var(--text-dim);">(Solo se envía; v1 lo ignora internamente)</div>
                   </div>
                 </div>
-                <div class="row2">
+                <div class="row2 trim-field" style="display:none;">
                   <div class="form-row">
                     <label>Inicio (seg)</label>
-                    <input type="text" id="video-start" placeholder="0" />
+                    <input type="number" id="video-start" value="0" min="0" step="0.5" />
                   </div>
                   <div class="form-row">
-                    <label>Fin (seg)</label>
-                    <input type="text" id="video-end" placeholder="ej: 30" />
+                    <label>Final (seg)</label>
+                    <input type="number" id="video-end" min="0" step="0.5" placeholder="ej: 30" />
                   </div>
+                </div>
+                <div class="form-row trim-field" style="display:none;">
+                  <label>O duración (seg)</label>
+                  <input type="number" id="video-duration" min="0" step="0.5" placeholder="ej: 15" />
                 </div>
                 <button class="btn btn-primary" id="video-btn" onclick="submitVideo()" style="width:100%;margin-top:10px;">
                   ▶ Procesar Video
@@ -952,7 +1053,13 @@ async function submitAudio() {
   }
 }
 
-// ─── VIDEO (v1 real) ────────────────────────────────
+// ─── VIDEO ───────────────────────────────────────────
+function toggleVideoFields() {
+  const op = $('video-op').value;
+  const show = op === 'trim';
+  document.querySelectorAll('#panel-video .trim-field').forEach(el => el.style.display = show ? '' : 'none');
+}
+
 async function submitVideo() {
   const fileInput = $('video-file');
   if (!fileInput.files.length) { toast('Selecciona un archivo de video', 'err'); return; }
@@ -963,15 +1070,19 @@ async function submitVideo() {
   try {
     const fd = new FormData();
     fd.append('file', fileInput.files[0]);
+    const op = $('video-op').value;
+    fd.append('operation', op);
 
-    // v1 route actualmente solo usa filename/file; el resto no se usa para construir outputs.
-    // Se mantienen campos para compatibilidad con UI existente (pero no se garantiza efecto).
-    fd.append('operation', $('video-op').value);
-    fd.append('format', $('video-fmt').value);
-    if ($('video-start').value) fd.append('start', $('video-start').value);
-    if ($('video-end').value) fd.append('end', $('video-end').value);
+    let endpoint = '/video/process-basic';
 
-    const r = await apiFetch('/video/process-basic', { method: 'POST', body: fd });
+    if (op === 'trim') {
+      endpoint = '/video/trim';
+      fd.append('start', $('video-start').value || '0');
+      if ($('video-end').value) fd.append('end', $('video-end').value);
+      if ($('video-duration').value) fd.append('duration', $('video-duration').value);
+    }
+
+    const r = await apiFetch(endpoint, { method: 'POST', body: fd });
 
     showResponse('video-response', r.data);
     toast('Video en procesamiento ✓');
@@ -986,6 +1097,69 @@ async function submitVideo() {
     toast('Error procesando video', 'err');
   } finally {
     setLoading('video-btn', false);
+  }
+}
+
+// ─── AUDIO EDITOR ───────────────────────────────────
+function toggleAudioEditorFields() {
+  const op = $('ae-op').value;
+  document.querySelectorAll('.ae-fields').forEach(el => el.style.display = 'none');
+  const target = $('ae-fields-' + op);
+  if (target) target.style.display = '';
+}
+
+function previewAudioEditor() {
+  const f = $('ae-file').files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  const isVideo = f.type.startsWith('video/');
+  $('ae-preview').innerHTML = isVideo
+    ? `<video controls src="${url}" style="max-height:120px;max-width:100%;"></video>`
+    : `<audio controls src="${url}" style="width:90%;"></audio>`;
+}
+
+async function submitAudioEditor() {
+  const fileInput = $('ae-file');
+  if (!fileInput.files.length) { toast('Selecciona un archivo', 'err'); return; }
+
+  const op = $('ae-op').value;
+  setLoading('ae-btn', true);
+  showResponse('ae-response', '⏳ Procesando...', false);
+
+  try {
+    const fd = new FormData();
+    fd.append('file', fileInput.files[0]);
+
+    let endpoint = '';
+    if (op === 'denoise') {
+      endpoint = '/audio/denoise';
+      fd.append('intensity', $('ae-denoise-intensity').value);
+    } else if (op === 'trim') {
+      endpoint = '/audio/trim';
+      fd.append('start', $('ae-trim-start').value || '0');
+      if ($('ae-trim-end').value) fd.append('end', $('ae-trim-end').value);
+      if ($('ae-trim-duration').value) fd.append('duration', $('ae-trim-duration').value);
+    } else if (op === 'normalize') {
+      endpoint = '/audio/normalize';
+    } else if (op === 'improve') {
+      endpoint = '/audio/improve';
+      fd.append('intensity', $('ae-improve-intensity').value);
+    }
+
+    const r = await apiFetch(endpoint, { method: 'POST', body: fd });
+    showResponse('ae-response', r.data);
+    toast('Audio procesado ✓');
+
+    const d = r.data || {};
+    if (d.job_id) {
+      $('ae-preview-out').innerHTML = `<div class="preview-placeholder"><div class="big">♯</div>Job: <b>${d.job_id}</b><br><small style="color:var(--text-dim)">Usa Outputs para esperar y previsualizar/descargar</small></div>`;
+      $('out-job-id').value = d.job_id;
+    }
+  } catch (e) {
+    showResponse('ae-response', e, true);
+    toast('Error procesando audio', 'err');
+  } finally {
+    setLoading('ae-btn', false);
   }
 }
 
