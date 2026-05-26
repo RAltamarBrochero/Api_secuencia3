@@ -15,6 +15,15 @@ app = FastAPI(title="Api_rowboat", version="0.1.0")
 app.include_router(router, prefix="")
 app.include_router(router_v2, prefix="")
 
+# Módulo independiente para uploads locales + endpoints wrapper híbridos
+from .modules.uploads_local.router import router_uploads_local
+app.include_router(router_uploads_local, prefix="")
+
+# Editor de audio/video local (denoise, trim, normalize, improve)
+from .api.routes_editor import router_editor
+app.include_router(router_editor, prefix="")
+
+
 
 # --- CORS (desarrollo local) ---
 # Dashboard puede abrirse como archivo local (origin: "null") o desde http://localhost/127.0.0.1.
